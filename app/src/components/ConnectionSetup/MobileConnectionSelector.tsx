@@ -7,6 +7,7 @@ import { Theme } from '@mui/material/styles'
 import { withStyles } from '@mui/styles'
 import { connectionManagerActions } from '../../actions'
 import { AppState } from '../../reducers'
+import { getOrderedConnections } from '../../utils/ConnectionOrdering'
 
 const styles = (theme: Theme) => ({
   container: {
@@ -112,7 +113,7 @@ const mapStateToProps = (state: AppState) => {
   const { connectionManager } = state
   const connections =
     connectionManager && connectionManager.connections
-      ? Object.values(connectionManager.connections).map(conn => ({
+      ? getOrderedConnections(connectionManager.connections, connectionManager.orderSettings).map(conn => ({
           id: conn.id,
           name: conn.name,
           host: conn.host,
