@@ -51,16 +51,29 @@ describe('ConnectionOrdering', () => {
     expect(descending.map(item => item.port)).to.deep.eq([9001, 8883, 1883])
   })
 
-  it('reorders custom entries and switches to custom mode', () => {
+  it('reorders custom entries before a target and switches to custom mode', () => {
     const reordered = reorderCustomConnections(
       connections,
       { sortMode: 'name-asc', customOrder: ['z', 'a', 'm'] },
       'm',
-      'z'
+      'z',
+      'before'
     )
 
     expect(reordered.sortMode).to.eq('custom')
     expect(reordered.customOrder).to.deep.eq(['m', 'z', 'a'])
+  })
+
+  it('can move a connection after the final target', () => {
+    const reordered = reorderCustomConnections(
+      connections,
+      { sortMode: 'custom', customOrder: ['z', 'a', 'm'] },
+      'z',
+      'm',
+      'after'
+    )
+
+    expect(reordered.customOrder).to.deep.eq(['a', 'm', 'z'])
   })
 
   it('removes stale ids and appends newly discovered connections', () => {
