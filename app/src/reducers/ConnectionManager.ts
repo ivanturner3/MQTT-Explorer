@@ -1,6 +1,7 @@
 import { Subscription } from 'mqtt-explorer-backend/src/DataSource/MqttSource'
 import { ConnectionOptions } from '../model/ConnectionOptions'
 import {
+  ConnectionDropPosition,
   ConnectionOrderSettings,
   ConnectionSortMode,
   defaultConnectionOrderSettings,
@@ -114,6 +115,7 @@ export interface ReorderConnections {
   type: ActionTypes.CONNECTION_MANAGER_REORDER_CONNECTIONS
   sourceId: string
   targetId: string
+  position: ConnectionDropPosition
 }
 
 export const connectionManagerReducer = createReducer(initialState, {
@@ -284,6 +286,12 @@ function setConnectionSortMode(state: ConnectionManagerState, action: SetConnect
 function reorderConnections(state: ConnectionManagerState, action: ReorderConnections): ConnectionManagerState {
   return {
     ...state,
-    orderSettings: reorderCustomConnections(state.connections, state.orderSettings, action.sourceId, action.targetId),
+    orderSettings: reorderCustomConnections(
+      state.connections,
+      state.orderSettings,
+      action.sourceId,
+      action.targetId,
+      action.position
+    ),
   }
 }
