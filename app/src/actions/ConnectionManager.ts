@@ -11,6 +11,7 @@ import {
   CertificateParameters,
 } from '../model/ConnectionOptions'
 import {
+  ConnectionDropPosition,
   ConnectionOrderSettings,
   ConnectionSortMode,
   defaultConnectionOrderSettings,
@@ -188,14 +189,16 @@ export const setConnectionSortMode = (sortMode: ConnectionSortMode) => (dispatch
   dispatch(saveConnectionOrderSettings() as any)
 }
 
-export const reorderConnections = (sourceId: string, targetId: string) => (dispatch: Dispatch<any>) => {
-  dispatch({
-    sourceId,
-    targetId,
-    type: ActionTypes.CONNECTION_MANAGER_REORDER_CONNECTIONS,
-  })
-  dispatch(saveConnectionOrderSettings() as any)
-}
+export const reorderConnections =
+  (sourceId: string, targetId: string, position: ConnectionDropPosition) => (dispatch: Dispatch<any>) => {
+    dispatch({
+      sourceId,
+      targetId,
+      position,
+      type: ActionTypes.CONNECTION_MANAGER_REORDER_CONNECTIONS,
+    })
+    dispatch(saveConnectionOrderSettings() as any)
+  }
 
 export const toggleAdvancedSettings = (): Action => ({
   type: ActionTypes.CONNECTION_MANAGER_TOGGLE_ADVANCED_SETTINGS,
