@@ -1,7 +1,7 @@
 import React from 'react'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
-import { List } from '@mui/material'
+import { FormControl, List, MenuItem, Select, SelectChangeEvent, Typography } from '@mui/material'
 import { Theme } from '@mui/material/styles'
 import { withStyles } from '@mui/styles'
 import ConnectionItem from './ConnectionItem'
@@ -9,6 +9,11 @@ import { AddButton } from './AddButton'
 import { AppState } from '../../../reducers'
 import { connectionManagerActions } from '../../../actions'
 import { ConnectionOptions } from '../../../model/ConnectionOptions'
+import {
+  ConnectionOrderSettings,
+  ConnectionSortMode,
+  getOrderedConnections,
+} from '../../../utils/ConnectionOrdering'
 import { KeyCodes } from '../../../utils/KeyCodes'
 import { useGlobalKeyEventHandler } from '../../../effects/useGlobalKeyEventHandler'
 
@@ -18,20 +23,23 @@ interface Props {
   classes: any
   selected?: string
   connections: { [s: string]: ConnectionOptions }
+  orderSettings: ConnectionOrderSettings
   actions: typeof connectionManagerActions
 }
 
 function ProfileList(props: Props) {
-  const { actions, classes, connections, selected } = props
+  const { actions, classes, connections, orderSettings, selected } = props
+  const [draggedId, setDraggedId] = React.useState<string | undefined>(undefined)
+  const orderedConnections = getOrderedConnections(connections, orderSettings)
+  const isCustomOrder = orderSettings.sortMode === 'custom'
 
   const selectConnection = (dir: 'next' | 'previous') => (event: KeyboardEvent) => {
     if (!selected) {
       return
     }
     const indexDirection = dir === 'next' ? 1 : -1
-    const connectionArray = Object.values(connections)
-    const selectedIndex = connectionArray.map(connection => connection.id).indexOf(selected)
-    const nextConnection = connectionArray[selectedIndex + indexDirection]
+    const selectedIndex = orderedConnections.map(connection => connection.id).indexOf(selected)
+    const nextConnection = orderedConnections[selectedIndex + indexDirection]
     if (nextConnection) {
       actions.selectConnection(nextConnection.id)
     }
@@ -41,18 +49,69 @@ function ProfileList(props: Props) {
   useGlobalKeyEventHandler(KeyCodes.arrow_down, selectConnection('next'))
   useGlobalKeyEventHandler(KeyCodes.arrow_up, selectConnection('previous'))
 
-  const createConnectionButton = (
-    <div style={{ padding: '8px 16px' }}>
-      <AddButton action={actions.createConnection} />
-      Connections
+  const handleSortChange = (event: SelectChangeEvent<string>) => {
+    actions.setConnectionSortMode(event.target.value as ConnectionSortMode)
+  }
+
+  const handleDrop = (targetId: string) => (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (isCustomOrder && draggedId && draggedId !== targetId) {
+      const bounds = event.currentTarget.getBoundingClientRect()
+      const position = event.clientY > bounds.top + bounds.height / 2 ? 'after' : 'before'
+      actions.reorderConnections(draggedId, targetId, position)
+    }
+    setDraggedId(undefined)
+  }
+
+  const connectionListHeader = (
+    <div className={classes.header}>
+      <div className={classes.headerTitle}>
+        <AddButton action={actions.createConnection} />
+        <span>Connections</span>
+      </div>
+      <FormControl fullWidth size="small">
+        <Select value={orderSettings.sortMode} onChange={handleSortChange} aria-label="Connection sort order">
+          <MenuItem value="custom">Custom order</MenuItem>
+          <MenuItem value="name-asc">Name: A → Z</MenuItem>
+          <MenuItem value="name-desc">Name: Z → A</MenuItem>
+          <MenuItem value="host-asc">Host: A → Z</MenuItem>
+          <MenuItem value="host-desc">Host: Z → A</MenuItem>
+          <MenuItem value="port-asc">Port: Low → High</MenuItem>
+          <MenuItem value="port-desc">Port: High → Low</MenuItem>
+        </Select>
+      </FormControl>
+      {isCustomOrder && (
+        <Typography className={classes.dragHint} variant="caption">
+          Drag connections to reorder
+        </Typography>
+      )}
     </div>
   )
 
   return (
-    <List style={{ height: '100%' }} component="nav" subheader={createConnectionButton}>
+    <List style={{ height: '100%' }} component="nav" subheader={connectionListHeader}>
       <div className={classes.list}>
-        {Object.values(connections).map(connection => (
-          <ConnectionItemAny connection={connection} key={connection.id} selected={selected === connection.id} />
+        {orderedConnections.map(connection => (
+          <div
+            key={connection.id}
+            draggable={isCustomOrder}
+            onDragStart={event => {
+              setDraggedId(connection.id)
+              event.dataTransfer.effectAllowed = 'move'
+              event.dataTransfer.setData('text/plain', connection.id)
+            }}
+            onDragEnd={() => setDraggedId(undefined)}
+            onDragOver={event => {
+              if (isCustomOrder) {
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+              }
+            }}
+            onDrop={handleDrop(connection.id)}
+            className={isCustomOrder ? classes.draggable : undefined}
+          >
+            <ConnectionItemAny connection={connection} selected={selected === connection.id} />
+          </div>
         ))}
       </div>
     </List>
@@ -60,10 +119,29 @@ function ProfileList(props: Props) {
 }
 
 const styles = (theme: Theme) => ({
+  header: {
+    padding: '8px 16px 4px',
+    backgroundColor: theme.palette.background.default,
+  },
+  headerTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: theme.spacing(1),
+  },
+  dragHint: {
+    display: 'block',
+    marginTop: theme.spacing(0.5),
+    color: theme.palette.text.secondary,
+  },
+  draggable: {
+    cursor: 'grab',
+    '&:active': {
+      cursor: 'grabbing',
+    },
+  },
   list: {
-    marginTop: theme.spacing(1),
-    height: `calc(100% - ${theme.spacing(6)})`,
-    overflowY: 'auto' as const,
+    marginTop: theme.spacing(0.5),
+    paddingBottom: theme.spacing(1),
   },
 })
 
@@ -73,6 +151,7 @@ const mapDispatchToProps = (dispatch: any) => ({
 
 const mapStateToProps = (state: AppState) => ({
   connections: state.connectionManager.connections,
+  orderSettings: state.connectionManager.orderSettings,
   selected: state.connectionManager.selected,
 })
 

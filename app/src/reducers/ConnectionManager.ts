@@ -1,5 +1,13 @@
 import { Subscription } from 'mqtt-explorer-backend/src/DataSource/MqttSource'
 import { ConnectionOptions } from '../model/ConnectionOptions'
+import {
+  ConnectionDropPosition,
+  ConnectionOrderSettings,
+  ConnectionSortMode,
+  defaultConnectionOrderSettings,
+  normalizeConnectionOrderSettings,
+  reorderCustomConnections,
+} from '../utils/ConnectionOrdering'
 import { createReducer } from './lib'
 
 export interface ConnectionManagerState {
@@ -7,6 +15,7 @@ export interface ConnectionManagerState {
   selected?: string
   showAdvancedSettings: boolean
   showCertificateSettings: boolean
+  orderSettings: ConnectionOrderSettings
 }
 
 const initialState: ConnectionManagerState = {
@@ -14,6 +23,7 @@ const initialState: ConnectionManagerState = {
   selected: undefined,
   showAdvancedSettings: false,
   showCertificateSettings: false,
+  orderSettings: defaultConnectionOrderSettings,
 }
 
 export type Action =
@@ -26,6 +36,9 @@ export type Action =
   | ToggleCertificateSettings
   | DeleteSubscription
   | AddSubscription
+  | SetConnectionOrderSettings
+  | SetConnectionSortMode
+  | ReorderConnections
 
 export enum ActionTypes {
   CONNECTION_MANAGER_SET_CONNECTIONS = 'CONNECTION_MANAGER_SET_CONNECTIONS',
@@ -37,6 +50,9 @@ export enum ActionTypes {
   CONNECTION_MANAGER_TOGGLE_CERTIFICATE_SETTINGS = 'CONNECTION_MANAGER_TOGGLE_CERTIFICATE_SETTINGS',
   CONNECTION_MANAGER_ADD_SUBSCRIPTION = 'CONNECTION_MANAGER_ADD_SUBSCRIPTION',
   CONNECTION_MANAGER_DELETE_SUBSCRIPTION = 'CONNECTION_MANAGER_DELETE_SUBSCRIPTION',
+  CONNECTION_MANAGER_SET_ORDER_SETTINGS = 'CONNECTION_MANAGER_SET_ORDER_SETTINGS',
+  CONNECTION_MANAGER_SET_SORT_MODE = 'CONNECTION_MANAGER_SET_SORT_MODE',
+  CONNECTION_MANAGER_REORDER_CONNECTIONS = 'CONNECTION_MANAGER_REORDER_CONNECTIONS',
 }
 
 export interface SetConnections {
@@ -85,6 +101,23 @@ export interface ToggleCertificateSettings {
   type: ActionTypes.CONNECTION_MANAGER_TOGGLE_CERTIFICATE_SETTINGS
 }
 
+export interface SetConnectionOrderSettings {
+  type: ActionTypes.CONNECTION_MANAGER_SET_ORDER_SETTINGS
+  orderSettings: ConnectionOrderSettings
+}
+
+export interface SetConnectionSortMode {
+  type: ActionTypes.CONNECTION_MANAGER_SET_SORT_MODE
+  sortMode: ConnectionSortMode
+}
+
+export interface ReorderConnections {
+  type: ActionTypes.CONNECTION_MANAGER_REORDER_CONNECTIONS
+  sourceId: string
+  targetId: string
+  position: ConnectionDropPosition
+}
+
 export const connectionManagerReducer = createReducer(initialState, {
   CONNECTION_MANAGER_SET_CONNECTIONS: setConnections,
   CONNECTION_MANAGER_SELECT_CONNECTION: selectConnection,
@@ -95,12 +128,16 @@ export const connectionManagerReducer = createReducer(initialState, {
   CONNECTION_MANAGER_TOGGLE_CERTIFICATE_SETTINGS: toggleCertificateSettings,
   CONNECTION_MANAGER_DELETE_SUBSCRIPTION: deleteSubscription,
   CONNECTION_MANAGER_ADD_SUBSCRIPTION: addSubscription,
+  CONNECTION_MANAGER_SET_ORDER_SETTINGS: setConnectionOrderSettings,
+  CONNECTION_MANAGER_SET_SORT_MODE: setConnectionSortMode,
+  CONNECTION_MANAGER_REORDER_CONNECTIONS: reorderConnections,
 })
 
 function setConnections(state: ConnectionManagerState, action: SetConnections): ConnectionManagerState {
   return {
     ...state,
     connections: action.connections,
+    orderSettings: normalizeConnectionOrderSettings(state.orderSettings, action.connections),
   }
 }
 
@@ -129,12 +166,15 @@ function toggleCertificateSettings(
 }
 
 function addConnection(state: ConnectionManagerState, action: AddConnection): ConnectionManagerState {
+  const connections = {
+    ...state.connections,
+    [action.connection.id]: action.connection,
+  }
+
   return {
     ...state,
-    connections: {
-      ...state.connections,
-      [action.connection.id]: action.connection,
-    },
+    connections,
+    orderSettings: normalizeConnectionOrderSettings(state.orderSettings, connections),
   }
 }
 
@@ -144,7 +184,6 @@ function addSubscription(state: ConnectionManagerState, action: AddSubscription)
   if (alreadyExists) {
     return state
   }
-
   const newSubscriptions = connection.subscriptions.slice()
   newSubscriptions.push(action.subscription)
   return {
@@ -186,6 +225,7 @@ function deleteConnection(state: ConnectionManagerState, action: DeleteConnectio
   return {
     ...state,
     connections,
+    orderSettings: normalizeConnectionOrderSettings(state.orderSettings, connections),
   }
 }
 
@@ -220,5 +260,38 @@ function updateConnection(state: ConnectionManagerState, action: UpdateConnectio
       ...state.connections,
       [action.connectionId]: connection,
     },
+  }
+}
+
+function setConnectionOrderSettings(
+  state: ConnectionManagerState,
+  action: SetConnectionOrderSettings
+): ConnectionManagerState {
+  return {
+    ...state,
+    orderSettings: normalizeConnectionOrderSettings(action.orderSettings, state.connections),
+  }
+}
+
+function setConnectionSortMode(state: ConnectionManagerState, action: SetConnectionSortMode): ConnectionManagerState {
+  return {
+    ...state,
+    orderSettings: {
+      ...normalizeConnectionOrderSettings(state.orderSettings, state.connections),
+      sortMode: action.sortMode,
+    },
+  }
+}
+
+function reorderConnections(state: ConnectionManagerState, action: ReorderConnections): ConnectionManagerState {
+  return {
+    ...state,
+    orderSettings: reorderCustomConnections(
+      state.connections,
+      state.orderSettings,
+      action.sourceId,
+      action.targetId,
+      action.position
+    ),
   }
 }

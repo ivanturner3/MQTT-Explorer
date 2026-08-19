@@ -10,6 +10,14 @@ import {
   makeDefaultConnections,
   CertificateParameters,
 } from '../model/ConnectionOptions'
+import {
+  ConnectionDropPosition,
+  ConnectionOrderSettings,
+  ConnectionSortMode,
+  defaultConnectionOrderSettings,
+  getOrderedConnections,
+  normalizeConnectionOrderSettings,
+} from '../utils/ConnectionOrdering'
 import { default as persistentStorage, StorageIdentifier } from '../utils/PersistentStorage'
 import { showError } from './Global'
 import { ActionTypes, Action } from '../reducers/ConnectionManager'
@@ -21,6 +29,9 @@ export interface ConnectionDictionary {
 }
 const storedConnectionsIdentifier: StorageIdentifier<ConnectionDictionary> = {
   id: 'ConnectionManager_connections',
+}
+const storedConnectionOrderIdentifier: StorageIdentifier<ConnectionOrderSettings> = {
+  id: 'ConnectionManager_orderSettings',
 }
 
 export const loadConnectionSettings = () => async (dispatch: Dispatch<any>, getState: () => AppState) => {
@@ -43,12 +54,24 @@ export const loadConnectionSettings = () => async (dispatch: Dispatch<any>, getS
   }
 
   dispatch(setConnections(connections))
-  const firstKey = Object.keys(connections)[0]
-  if (firstKey) {
-    dispatch(selectConnection(firstKey))
+
+  let orderSettings = normalizeConnectionOrderSettings(defaultConnectionOrderSettings, connections)
+  try {
+    const storedOrderSettings = await persistentStorage.load(storedConnectionOrderIdentifier)
+    orderSettings = normalizeConnectionOrderSettings(storedOrderSettings, connections)
+    // Persist the normalized shape so added/deleted connections and older settings self-heal.
+    await persistentStorage.store(storedConnectionOrderIdentifier, orderSettings)
+  } catch (error) {
+    dispatch(showError(error))
+  }
+
+  dispatch(setConnectionOrderSettings(orderSettings))
+  const firstConnection = getOrderedConnections(connections, orderSettings)[0]
+  if (firstConnection) {
+    dispatch(selectConnection(firstConnection.id))
   } else {
     // No connections exist - create a default one
-    dispatch(createConnection())
+    dispatch(createConnection() as any)
   }
 }
 
@@ -103,6 +126,16 @@ export const saveConnectionSettings = () => async (dispatch: Dispatch<any>, getS
   }
 }
 
+export const saveConnectionOrderSettings = () => async (dispatch: Dispatch<any>, getState: () => AppState) => {
+  try {
+    const state = getState().connectionManager
+    const normalized = normalizeConnectionOrderSettings(state.orderSettings, state.connections)
+    await persistentStorage.store(storedConnectionOrderIdentifier, normalized)
+  } catch (error) {
+    dispatch(showError(error))
+  }
+}
+
 export const updateConnection = (connectionId: string, changeSet: Partial<ConnectionOptions>): Action => ({
   connectionId,
   changeSet,
@@ -121,10 +154,11 @@ export const deleteSubscription = (subscription: Subscription, connectionId: str
   type: ActionTypes.CONNECTION_MANAGER_DELETE_SUBSCRIPTION,
 })
 
-export const createConnection = () => (dispatch: Dispatch<any>) => {
+export const createConnection = () => (dispatch: Dispatch<any>, getState: () => AppState) => {
   const newConnection = createEmptyConnection()
   dispatch(addConnection(newConnection))
   dispatch(selectConnection(newConnection.id))
+  dispatch(saveConnectionOrderSettings() as any)
 }
 
 export const setConnections = (connections: { [s: string]: ConnectionOptions }): Action => ({
@@ -142,6 +176,30 @@ export const addConnection = (connection: ConnectionOptions): Action => ({
   type: ActionTypes.CONNECTION_MANAGER_ADD_CONNECTION,
 })
 
+export const setConnectionOrderSettings = (orderSettings: ConnectionOrderSettings): Action => ({
+  orderSettings,
+  type: ActionTypes.CONNECTION_MANAGER_SET_ORDER_SETTINGS,
+})
+
+export const setConnectionSortMode = (sortMode: ConnectionSortMode) => (dispatch: Dispatch<any>) => {
+  dispatch({
+    sortMode,
+    type: ActionTypes.CONNECTION_MANAGER_SET_SORT_MODE,
+  })
+  dispatch(saveConnectionOrderSettings() as any)
+}
+
+export const reorderConnections =
+  (sourceId: string, targetId: string, position: ConnectionDropPosition) => (dispatch: Dispatch<any>) => {
+    dispatch({
+      sourceId,
+      targetId,
+      position,
+      type: ActionTypes.CONNECTION_MANAGER_REORDER_CONNECTIONS,
+    })
+    dispatch(saveConnectionOrderSettings() as any)
+  }
+
 export const toggleAdvancedSettings = (): Action => ({
   type: ActionTypes.CONNECTION_MANAGER_TOGGLE_ADVANCED_SETTINGS,
 })
@@ -151,17 +209,20 @@ export const toggleCertificateSettings = (): Action => ({
 })
 
 export const deleteConnection = (connectionId: string) => (dispatch: Dispatch<any>, getState: () => AppState) => {
-  const connectionIds = Object.keys(getState().connectionManager.connections)
-  const connectionIdLocation = connectionIds.indexOf(connectionId)
-
-  const remainingIds = connectionIds.filter(id => id !== connectionId)
-  const nextSelectedConnectionIndex = Math.min(remainingIds.length - 1, connectionIdLocation)
+  const stateBeforeDelete = getState().connectionManager
+  const orderedConnectionIds = getOrderedConnections(stateBeforeDelete.connections, stateBeforeDelete.orderSettings).map(
+    connection => connection.id
+  )
+  const connectionIdLocation = orderedConnectionIds.indexOf(connectionId)
+  const remainingIds = orderedConnectionIds.filter(id => id !== connectionId)
+  const nextSelectedConnectionIndex = Math.min(remainingIds.length - 1, Math.max(0, connectionIdLocation))
   const nextSelectedConnection = remainingIds[nextSelectedConnectionIndex]
 
   dispatch({
     connectionId,
     type: ActionTypes.CONNECTION_MANAGER_DELETE_CONNECTION,
   })
+  dispatch(saveConnectionOrderSettings() as any)
 
   if (nextSelectedConnection) {
     dispatch(selectConnection(nextSelectedConnection))
