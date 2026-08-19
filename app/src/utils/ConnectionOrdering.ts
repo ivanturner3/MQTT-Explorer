@@ -9,6 +9,8 @@ export type ConnectionSortMode =
   | 'port-asc'
   | 'port-desc'
 
+export type ConnectionDropPosition = 'before' | 'after'
+
 export interface ConnectionOrderSettings {
   sortMode: ConnectionSortMode
   customOrder: string[]
@@ -99,7 +101,8 @@ export function reorderCustomConnections(
   connections: { [s: string]: ConnectionOptions },
   settings: ConnectionOrderSettings,
   sourceId: string,
-  targetId: string
+  targetId: string,
+  position: ConnectionDropPosition = 'before'
 ): ConnectionOrderSettings {
   const normalized = normalizeConnectionOrderSettings(settings, connections)
   if (sourceId === targetId || !connections[sourceId] || !connections[targetId]) {
@@ -108,7 +111,8 @@ export function reorderCustomConnections(
 
   const nextOrder = normalized.customOrder.filter(id => id !== sourceId)
   const targetIndex = nextOrder.indexOf(targetId)
-  nextOrder.splice(targetIndex < 0 ? nextOrder.length : targetIndex, 0, sourceId)
+  const insertionIndex = targetIndex < 0 ? nextOrder.length : targetIndex + (position === 'after' ? 1 : 0)
+  nextOrder.splice(insertionIndex, 0, sourceId)
 
   return {
     sortMode: 'custom',
