@@ -56,7 +56,9 @@ function ProfileList(props: Props) {
   const handleDrop = (targetId: string) => (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     if (isCustomOrder && draggedId && draggedId !== targetId) {
-      actions.reorderConnections(draggedId, targetId)
+      const bounds = event.currentTarget.getBoundingClientRect()
+      const position = event.clientY > bounds.top + bounds.height / 2 ? 'after' : 'before'
+      actions.reorderConnections(draggedId, targetId, position)
     }
     setDraggedId(undefined)
   }
@@ -93,11 +95,16 @@ function ProfileList(props: Props) {
           <div
             key={connection.id}
             draggable={isCustomOrder}
-            onDragStart={() => setDraggedId(connection.id)}
+            onDragStart={event => {
+              setDraggedId(connection.id)
+              event.dataTransfer.effectAllowed = 'move'
+              event.dataTransfer.setData('text/plain', connection.id)
+            }}
             onDragEnd={() => setDraggedId(undefined)}
             onDragOver={event => {
               if (isCustomOrder) {
                 event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
               }
             }}
             onDrop={handleDrop(connection.id)}
