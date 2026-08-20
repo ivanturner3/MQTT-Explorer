@@ -20,6 +20,12 @@ registerCrashReporter()
 // }
 
 app.commandLine.appendSwitch('--no-sandbox')
+
+// Keep this test distribution completely separate from a user's normal MQTT
+// Explorer configuration so it can be tested side-by-side without overwriting
+// existing connections or preferences.
+app.setPath('userData', path.join(app.getPath('appData'), 'MQTT Explorer Custom Test'))
+
 app.whenReady().then(() => {
   backendRpc.on(makeOpenDialogRpc(), async request => {
     return dialog.showOpenDialog(BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0], request)
