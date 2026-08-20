@@ -1,7 +1,12 @@
+import { app } from 'electron'
 import { autoUpdater, UpdateInfo } from 'electron-updater'
 // import { BuildInfo } from 'electron-telemetry/build/Model'
 
 export function shouldAutoUpdate(build: any) {
+  if (app.getVersion().includes('custom')) {
+    return false
+  }
+
   return (
     build.package !== 'portable' &&
     build.package !== 'appx' &&
