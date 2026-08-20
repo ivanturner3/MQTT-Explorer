@@ -13,7 +13,7 @@ const applicationMenu: MenuItemConstructorOptions = {
           license: 'CC-BY-ND-4.0',
           homepage: 'https://thomasnordquist.github.io/MQTT-Explorer/',
           bug_report_url: 'https://github.com/thomasnordquist/MQTT-Explorer/issues',
-          description: 'Author: Thomas Nordquist',
+          description: 'Authors: Thomas Nordquist & Ivan Turner',
         })
       },
     },
