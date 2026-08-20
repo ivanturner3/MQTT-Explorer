@@ -25,6 +25,50 @@ interface Props {
   actions: typeof connectionManagerActions
 }
 
+function getEffectiveBackgroundColor(element: HTMLElement): string {
+  let current: HTMLElement | null = element
+  while (current) {
+    const backgroundColor = window.getComputedStyle(current).backgroundColor
+    if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
+      return backgroundColor
+    }
+    current = current.parentElement
+  }
+  return 'transparent'
+}
+
+function setConnectionDragImage(event: React.DragEvent<HTMLDivElement>) {
+  const source = event.currentTarget
+  const bounds = source.getBoundingClientRect()
+  const dragImage = source.cloneNode(true) as HTMLElement
+
+  // Chromium can occasionally capture surrounding Material-UI list content for the
+  // default drag ghost. Use an explicit clone of only the connection row instead.
+  dragImage.removeAttribute('draggable')
+  dragImage.style.position = 'fixed'
+  dragImage.style.left = '-10000px'
+  dragImage.style.top = '-10000px'
+  dragImage.style.width = `${bounds.width}px`
+  dragImage.style.height = `${bounds.height}px`
+  dragImage.style.margin = '0'
+  dragImage.style.pointerEvents = 'none'
+  dragImage.style.opacity = '1'
+  dragImage.style.backgroundColor = getEffectiveBackgroundColor(source)
+  document.body.appendChild(dragImage)
+
+  const offsetX = Math.max(0, Math.min(event.clientX - bounds.left, bounds.width))
+  const offsetY = Math.max(0, Math.min(event.clientY - bounds.top, bounds.height))
+  event.dataTransfer.setDragImage(dragImage, offsetX, offsetY)
+
+  // The element must exist during dragstart, but can be removed immediately after
+  // Chromium has captured it as the drag image.
+  window.setTimeout(() => {
+    if (dragImage.parentNode) {
+      dragImage.parentNode.removeChild(dragImage)
+    }
+  }, 0)
+}
+
 function ProfileList(props: Props) {
   const { actions, classes, connections, orderSettings, selected } = props
   const [sortAnchor, setSortAnchor] = React.useState<HTMLElement | null>(null)
@@ -116,6 +160,7 @@ function ProfileList(props: Props) {
               setDraggedId(connection.id)
               event.dataTransfer.effectAllowed = 'move'
               event.dataTransfer.setData('text/plain', connection.id)
+              setConnectionDragImage(event)
             }}
             onDragEnd={() => setDraggedId(undefined)}
             onDragOver={event => {
