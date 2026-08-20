@@ -27,6 +27,8 @@ export interface ConnectionOptions {
   clientKey?: CertificateParameters
   clientId?: string
   subscriptions: Array<Subscription>
+  autoReconnect?: boolean
+  persistentSession?: boolean
 }
 
 export function toMqttConnection(options: ConnectionOptions): MqttOptions | undefined {
@@ -45,6 +47,8 @@ export function toMqttConnection(options: ConnectionOptions): MqttOptions | unde
     certificateAuthority: options.selfSignedCertificate ? options.selfSignedCertificate.data : undefined,
     clientCertificate: options.clientCertificate ? options.clientCertificate.data : undefined,
     clientKey: options.clientKey ? options.clientKey.data : undefined,
+    autoReconnect: options.autoReconnect !== false,
+    persistentSession: options.persistentSession === true,
   }
 }
 
@@ -67,6 +71,8 @@ export function createEmptyConnection(): ConnectionOptions {
       { topic: '#', qos: 0 },
       { topic: '$SYS/#', qos: 0 },
     ],
+    autoReconnect: true,
+    persistentSession: false,
     type: 'mqtt',
     host: '',
     port: 1883,
