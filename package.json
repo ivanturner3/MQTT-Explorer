@@ -1,5 +1,5 @@
 {
-  "name": "MQTT-Explorer",
+  "name": "MQTT-Explorer-Custom-Test",
   "version": "0.4.0-beta.6.custom.1",
   "description": "Explore your message queues",
   "main": "dist/src/electron.js",
@@ -35,8 +35,9 @@
     "url": "https://github.com/thomasnordquist/MQTT-Explorer.git"
   },
   "build": {
-    "appId": "mqtt-explorer",
-    "productName": "MQTT Explorer",
+    "appId": "mqtt-explorer-custom-test",
+    "productName": "MQTT Explorer Custom Test",
+    "artifactName": "MQTT-Explorer-Custom-Test-${version}-${arch}.${ext}",
     "nodeGypRebuild": false,
     "mac": {
       "appId": "de.t7n.apps.mqtt-explorer",
