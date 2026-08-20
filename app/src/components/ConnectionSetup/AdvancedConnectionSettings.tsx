@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useState, useCallback, memo } from 'react'
 import Add from '@material-ui/icons/Add'
+import HelpOutline from '@material-ui/icons/HelpOutline'
 import Lock from '@material-ui/icons/Lock'
 import Undo from '@material-ui/icons/Undo'
 import { bindActionCreators } from 'redux'
@@ -8,7 +9,7 @@ import { connect } from 'react-redux'
 import { connectionManagerActions } from '../../actions'
 import { ConnectionOptions } from '../../model/ConnectionOptions'
 import { Theme, withStyles } from '@material-ui/core/styles'
-import { Button, FormControlLabel, Grid, Switch, TextField, Tooltip, Typography } from '@material-ui/core'
+import { Button, FormControlLabel, Grid, IconButton, Switch, TextField, Tooltip } from '@material-ui/core'
 import { QosSelect } from '../QosSelect'
 import { QoS } from '../../../../backend/src/DataSource/MqttSource'
 import Subscriptions from './Subscriptions'
@@ -104,19 +105,27 @@ const ConnectionSettings = memo(function ConnectionSettings(props: Props) {
                 }
                 label="Auto reconnect"
               />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={persistentSessionEnabled}
-                    onChange={toggleBooleanSetting('persistentSession', props.connection.persistentSession, false)}
-                    color="primary"
-                  />
-                }
-                label="Persistent session"
-              />
-              <Typography variant="caption" display="block" color="textSecondary">
-                Persistent sessions can recover broker-queued QoS 1/2 messages after reconnect when supported by the broker.
-              </Typography>
+              <div className={classes.persistentSessionRow}>
+                <FormControlLabel
+                  className={classes.persistentSessionLabel}
+                  control={
+                    <Switch
+                      checked={persistentSessionEnabled}
+                      onChange={toggleBooleanSetting('persistentSession', props.connection.persistentSession, false)}
+                      color="primary"
+                    />
+                  }
+                  label="Persistent session"
+                />
+                <Tooltip
+                  title="Keeps the MQTT session on the broker so eligible queued QoS 1/2 messages can be delivered after reconnect. Requires broker support and a stable client ID."
+                  placement="top"
+                >
+                  <IconButton className={classes.helpButton} aria-label="Persistent session help">
+                    <HelpOutline fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </div>
             </div>
           </Grid>
           <Grid item={true} xs={3} className={classes.gridPadding}>
@@ -169,6 +178,17 @@ const styles = (theme: Theme) => ({
   },
   connectionRecoverySettings: {
     marginTop: theme.spacing(1),
+  },
+  persistentSessionRow: {
+    display: 'flex' as 'flex',
+    alignItems: 'center' as 'center',
+  },
+  persistentSessionLabel: {
+    marginRight: 0,
+  },
+  helpButton: {
+    padding: theme.spacing(0.5),
+    marginLeft: theme.spacing(0.5),
   },
 })
 
