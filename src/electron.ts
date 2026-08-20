@@ -1,7 +1,7 @@
 import * as log from 'electron-log'
 import * as path from 'path'
 import ConfigStorage from '../backend/src/ConfigStorage'
-import { app, BrowserWindow, Menu, dialog } from 'electron'
+import { app, BrowserWindow, Menu, dialog, powerSaveBlocker } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { ConnectionManager } from '../backend/src/index'
 // import { electronTelemetryFactory } from 'electron-telemetry'
@@ -11,7 +11,7 @@ import { waitForDevServer, isDev, runningUiTestOnCi, loadDevTools } from './deve
 import { shouldAutoUpdate, handleAutoUpdate } from './autoUpdater'
 import { registerCrashReporter } from './registerCrashReporter'
 import { makeOpenDialogRpc } from '../events/OpenDialogRequest'
-import { backendRpc, getAppVersion } from '../events'
+import { addMqttConnectionEvent, backendEvents, backendRpc, getAppVersion, removeConnection } from '../events'
 
 registerCrashReporter()
 
@@ -32,6 +32,51 @@ log.info('App starting...')
 
 const connectionManager = new ConnectionManager()
 connectionManager.manageConnections()
+
+// Keep Windows/macOS/Linux from automatically suspending the system while MQTT
+// Explorer is actively monitoring at least one connection. This still permits
+// the display to turn off and does not override an explicit user-requested sleep.
+const activeConnectionIds = new Set<string>()
+let connectionPowerSaveBlockerId: number | undefined
+
+function startConnectionPowerSaveBlocker() {
+  if (
+    connectionPowerSaveBlockerId === undefined ||
+    !powerSaveBlocker.isStarted(connectionPowerSaveBlockerId)
+  ) {
+    connectionPowerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension')
+    log.info('Preventing automatic system sleep while an MQTT connection is active')
+  }
+}
+
+function stopConnectionPowerSaveBlocker() {
+  if (
+    connectionPowerSaveBlockerId !== undefined &&
+    powerSaveBlocker.isStarted(connectionPowerSaveBlockerId)
+  ) {
+    powerSaveBlocker.stop(connectionPowerSaveBlockerId)
+    log.info('Allowing automatic system sleep; no MQTT connections are active')
+  }
+  connectionPowerSaveBlockerId = undefined
+}
+
+function updateConnectionPowerSaveBlocker() {
+  if (activeConnectionIds.size > 0) {
+    startConnectionPowerSaveBlocker()
+  } else {
+    stopConnectionPowerSaveBlocker()
+  }
+}
+
+backendEvents.subscribe(addMqttConnectionEvent, event => {
+  activeConnectionIds.add(event.id)
+  updateConnectionPowerSaveBlocker()
+})
+
+backendEvents.subscribe(removeConnection, connectionId => {
+  activeConnectionIds.delete(connectionId)
+  updateConnectionPowerSaveBlocker()
+})
 
 const configStorage = new ConfigStorage(path.join(app.getPath('userData'), 'settings.json'))
 configStorage.init()
@@ -81,6 +126,8 @@ async function createWindow() {
   // Emitted when the window is closed.
   mainWindow.on('close', () => {
     connectionManager.closeAllConnections()
+    activeConnectionIds.clear()
+    stopConnectionPowerSaveBlocker()
   })
 
   // Emitted when the window is closed.
@@ -103,6 +150,11 @@ app.on('ready', () => {
   if (shouldAutoUpdate(buildOptions)) {
     handleAutoUpdate()
   }
+})
+
+app.on('before-quit', () => {
+  activeConnectionIds.clear()
+  stopConnectionPowerSaveBlocker()
 })
 
 // Quit when all windows are closed.
