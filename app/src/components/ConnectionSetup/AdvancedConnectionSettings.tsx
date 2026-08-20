@@ -8,7 +8,7 @@ import { connect } from 'react-redux'
 import { connectionManagerActions } from '../../actions'
 import { ConnectionOptions } from '../../model/ConnectionOptions'
 import { Theme, withStyles } from '@material-ui/core/styles'
-import { Button, Grid, TextField, Tooltip } from '@material-ui/core'
+import { Button, FormControlLabel, Grid, Switch, TextField, Tooltip, Typography } from '@material-ui/core'
 import { QosSelect } from '../QosSelect'
 import { QoS } from '../../../../backend/src/DataSource/MqttSource'
 import Subscriptions from './Subscriptions'
@@ -37,6 +37,19 @@ const ConnectionSettings = memo(function ConnectionSettings(props: Props) {
     },
     []
   )
+
+  const toggleBooleanSetting = useCallback(
+    (name: 'autoReconnect' | 'persistentSession', currentValue: boolean | undefined, defaultValue: boolean) => () => {
+      const effectiveValue = currentValue === undefined ? defaultValue : currentValue
+      props.managerActions.updateConnection(props.connection.id, {
+        [name]: !effectiveValue,
+      })
+    },
+    [props.connection.id]
+  )
+
+  const autoReconnectEnabled = props.connection.autoReconnect !== false
+  const persistentSessionEnabled = props.connection.persistentSession === true
 
   return (
     <div>
@@ -78,6 +91,33 @@ const ConnectionSettings = memo(function ConnectionSettings(props: Props) {
               value={props.connection.clientId}
               onChange={handleChange('clientId')}
             />
+          </Grid>
+          <Grid item={true} xs={5} className={classes.gridPadding}>
+            <div className={classes.connectionRecoverySettings}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={autoReconnectEnabled}
+                    onChange={toggleBooleanSetting('autoReconnect', props.connection.autoReconnect, true)}
+                    color="primary"
+                  />
+                }
+                label="Auto reconnect"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={persistentSessionEnabled}
+                    onChange={toggleBooleanSetting('persistentSession', props.connection.persistentSession, false)}
+                    color="primary"
+                  />
+                }
+                label="Persistent session"
+              />
+              <Typography variant="caption" display="block" color="textSecondary">
+                Persistent sessions can recover broker-queued QoS 1/2 messages after reconnect when supported by the broker.
+              </Typography>
+            </div>
           </Grid>
           <Grid item={true} xs={3} className={classes.gridPadding}>
             <div>
@@ -125,6 +165,9 @@ const styles = (theme: Theme) => ({
     float: 'right' as 'right',
   },
   qos: {
+    marginTop: theme.spacing(1),
+  },
+  connectionRecoverySettings: {
     marginTop: theme.spacing(1),
   },
 })
