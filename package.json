@@ -71,7 +71,7 @@
     },
     "afterPack": "./dist/scripts/afterPack.js"
   },
-  "author": "Thomas Nordquist",
+  "author": "Thomas Nordquist & Ivan Turner",
   "email": "xxnerowingerxx@gmail.com",
   "homepage": "https://github.com",
   "license": "CC-BY-ND-4.0",
