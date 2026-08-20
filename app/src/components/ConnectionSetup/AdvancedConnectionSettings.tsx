@@ -55,6 +55,41 @@ const ConnectionSettings = memo(function ConnectionSettings(props: Props) {
   return (
     <div>
       <form className={classes.container} noValidate={true} autoComplete="off">
+        <div className={classes.connectionRecoverySettings}>
+          <FormControlLabel
+            className={classes.recoverySettingLabel}
+            control={
+              <Switch
+                checked={autoReconnectEnabled}
+                onChange={toggleBooleanSetting('autoReconnect', props.connection.autoReconnect, true)}
+                color="primary"
+              />
+            }
+            label="Auto reconnect"
+          />
+          <div className={classes.persistentSessionRow}>
+            <FormControlLabel
+              className={`${classes.recoverySettingLabel} ${classes.persistentSessionLabel}`}
+              control={
+                <Switch
+                  checked={persistentSessionEnabled}
+                  onChange={toggleBooleanSetting('persistentSession', props.connection.persistentSession, false)}
+                  color="primary"
+                />
+              }
+              label="Persistent session"
+            />
+            <Tooltip
+              title="Keeps the MQTT session on the broker so eligible queued QoS 1/2 messages can be delivered after reconnect. Requires broker support and a stable client ID."
+              placement="top"
+            >
+              <IconButton className={classes.helpButton} aria-label="Persistent session help">
+                <HelpOutline fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </div>
+        </div>
+
         <Grid container={true} spacing={3}>
           <Grid item={true} xs={8} className={classes.gridPadding}>
             <TextField
@@ -93,41 +128,6 @@ const ConnectionSettings = memo(function ConnectionSettings(props: Props) {
               onChange={handleChange('clientId')}
             />
           </Grid>
-          <Grid item={true} xs={5} className={classes.gridPadding}>
-            <div className={classes.connectionRecoverySettings}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={autoReconnectEnabled}
-                    onChange={toggleBooleanSetting('autoReconnect', props.connection.autoReconnect, true)}
-                    color="primary"
-                  />
-                }
-                label="Auto reconnect"
-              />
-              <div className={classes.persistentSessionRow}>
-                <FormControlLabel
-                  className={classes.persistentSessionLabel}
-                  control={
-                    <Switch
-                      checked={persistentSessionEnabled}
-                      onChange={toggleBooleanSetting('persistentSession', props.connection.persistentSession, false)}
-                      color="primary"
-                    />
-                  }
-                  label="Persistent session"
-                />
-                <Tooltip
-                  title="Keeps the MQTT session on the broker so eligible queued QoS 1/2 messages can be delivered after reconnect. Requires broker support and a stable client ID."
-                  placement="top"
-                >
-                  <IconButton className={classes.helpButton} aria-label="Persistent session help">
-                    <HelpOutline fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </div>
-            </div>
-          </Grid>
           <Grid item={true} xs={3} className={classes.gridPadding}>
             <div>
               <Tooltip title="Manage tls connection certificates" placement="top">
@@ -163,6 +163,9 @@ const mapDispatchToProps = (dispatch: any) => {
 }
 
 const styles = (theme: Theme) => ({
+  container: {
+    position: 'relative' as 'relative',
+  },
   fullWidth: {
     width: '100%',
   },
@@ -177,7 +180,18 @@ const styles = (theme: Theme) => ({
     marginTop: theme.spacing(1),
   },
   connectionRecoverySettings: {
-    marginTop: theme.spacing(1),
+    position: 'absolute' as 'absolute',
+    top: `-${theme.spacing(7)}px`,
+    right: theme.spacing(1),
+    display: 'flex' as 'flex',
+    flexDirection: 'column' as 'column',
+    alignItems: 'flex-start' as 'flex-start',
+    zIndex: 1,
+  },
+  recoverySettingLabel: {
+    marginTop: `-${theme.spacing(0.75)}px`,
+    marginBottom: `-${theme.spacing(0.75)}px`,
+    marginRight: 0,
   },
   persistentSessionRow: {
     display: 'flex' as 'flex',
@@ -188,7 +202,7 @@ const styles = (theme: Theme) => ({
   },
   helpButton: {
     padding: theme.spacing(0.5),
-    marginLeft: theme.spacing(0.5),
+    marginLeft: theme.spacing(0.25),
   },
 })
 
