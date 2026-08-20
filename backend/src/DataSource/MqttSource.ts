@@ -16,6 +16,8 @@ export interface MqttOptions {
   certificateAuthority?: string
   clientCertificate?: string
   clientKey?: string
+  autoReconnect?: boolean
+  persistentSession?: boolean
 }
 
 export interface Subscription {
@@ -47,8 +49,13 @@ export class MqttSource implements DataSource<MqttOptions> {
       throw error
     }
 
+    const autoReconnect = options.autoReconnect !== false
+    const persistentSession = options.persistentSession === true
+
     const client = mqttConnect(url.toString(), {
       resubscribe: false,
+      reconnectPeriod: autoReconnect ? 1000 : 0,
+      clean: !persistentSession,
       rejectUnauthorized: options.certValidation,
       username: options.username,
       password: options.password,
@@ -66,6 +73,10 @@ export class MqttSource implements DataSource<MqttOptions> {
       this.stateMachine.setError(error)
     })
 
+    client.on('offline', () => {
+      this.stateMachine.setConnected(false)
+    })
+
     client.on('close', () => {
       this.stateMachine.setConnected(false)
     })
@@ -78,15 +89,20 @@ export class MqttSource implements DataSource<MqttOptions> {
       this.stateMachine.setConnecting()
     })
 
-    client.on('connect', () => {
+    client.on('connect', (packet: any) => {
       this.stateMachine.setConnected(true)
-      options.subscriptions.forEach(subscription => {
-        client.subscribe(subscription.topic, { qos: subscription.qos }, (err: Error) => {
-          if (err) {
-            this.stateMachine.setError(err)
-          }
+
+      // With a persistent MQTT session, an existing broker-side session already
+      // contains the subscriptions. Otherwise subscribe normally after connect.
+      if (!persistentSession || !packet.sessionPresent) {
+        options.subscriptions.forEach(subscription => {
+          client.subscribe(subscription.topic, { qos: subscription.qos }, (err: Error) => {
+            if (err) {
+              this.stateMachine.setError(err)
+            }
+          })
         })
-      })
+      }
     })
 
     client.on('message', (topic, message, packet) => {
